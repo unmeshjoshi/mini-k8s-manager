@@ -1,0 +1,55 @@
+@startuml
+participant "User/kubectl" as user
+participant "API Server" as api
+participant "ClusterController" as controller
+participant "DockerProvider" as provider
+participant "Docker Engine" as docker
+
+== Cluster Creation ==
+user -> api: Create Cluster CR
+api -> controller: Watch Event (Create)
+controller -> controller: Set Phase: Pending
+controller -> controller: Add Finalizer
+controller -> controller: Set Phase: Provisioning
+controller -> provider: CreateCluster()
+provider -> docker: Create Control Plane Container
+provider -> docker: Create Worker Node Containers
+provider -> docker: Setup Container Network
+provider -> docker: Configure Container Resources
+provider --> controller: Cluster Created
+controller -> controller: Set Phase: Running
+controller --> api: Update Status
+api --> user: Cluster Status: Running
+
+== Cluster Monitoring ==
+loop Every 30s
+    controller -> provider: GetClusterStatus()
+    provider -> docker: Check Container Status
+    docker --> provider: Container States
+    provider --> controller: Cluster Status
+    controller -> api: Update Status
+end
+
+== Cluster Update ==
+user -> api: Update Cluster CR (e.g. scale workers)
+api -> controller: Watch Event (Update)
+controller -> provider: UpdateCluster()
+provider -> docker: Create/Remove Worker Containers
+provider -> docker: Update Network Config
+provider --> controller: Update Complete
+controller -> api: Update Status
+api --> user: Update Status: Complete
+
+== Cluster Deletion ==
+user -> api: Delete Cluster CR
+api -> controller: Watch Event (Delete)
+controller -> provider: DeleteCluster()
+provider -> docker: Stop Containers
+provider -> docker: Remove Containers
+provider -> docker: Cleanup Network
+provider --> controller: Deletion Complete
+controller -> controller: Remove Finalizer
+controller --> api: Update Status
+api --> user: Cluster Deleted
+
+@enduml

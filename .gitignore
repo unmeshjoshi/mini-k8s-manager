@@ -1,0 +1,9 @@
+# Ignore binaries
+/bin/
+/obj/
+
+# Ignore environment files
+.env
+
+# Ignore test results
+*.test
